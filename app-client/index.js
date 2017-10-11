@@ -1,3 +1,8 @@
+import io from 'socket.io-client'
+import { Client } from 'graphql-socketio-subscriptions-transport'
+
+import { GRAPHQL_HTTP_PATH, GRAPHQL_WS_PATH } from './config'
+
 var search = window.location.search;
 var parameters = {};
 search.substr(1).split('&').forEach(function (entry) {
@@ -42,7 +47,7 @@ function updateURL() {
 
 function graphQLFetcher(graphQLParams) {
 
-	return fetch('http://localhost:8181/graphql', {
+	return fetch(SUBSCRIPTION_PATH, {
 		method: 'POST',
 		headers: {
 			'Accept': 'application/json',
@@ -74,11 +79,9 @@ function hasSubscriptionOperation(graphQlParams){
 	}
 	return false;
 }
-import io from 'socket.io-client'
-import { Client } from 'app/lib/graphql-subscriptions-socketio'
+
 
 let subscriptionsFetcher;
-
 const socket = io('http://localhost:8181/');
 socket.on('connect',()=>{
 	const client = new Client(socket);
