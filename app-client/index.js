@@ -47,7 +47,7 @@ function updateURL() {
 
 function graphQLFetcher(graphQLParams) {
 
-	return fetch(SUBSCRIPTION_PATH, {
+	return fetch(GRAPHQL_HTTP_PATH, {
 		method: 'POST',
 		headers: {
 			'Accept': 'application/json',
@@ -82,7 +82,7 @@ function hasSubscriptionOperation(graphQlParams){
 
 
 let subscriptionsFetcher;
-const socket = io('http://localhost:8181/');
+const socket = io(GRAPHQL_WS_PATH);
 socket.on('connect',()=>{
 	const client = new Client(socket);
 
