@@ -97,14 +97,15 @@ socket.on('connect',()=>{
 			return {
 				subscribe: (observer) => {
 					observer.next('Your subscription data will appear here after server publication!');
-					
+										
 					activeSubscriptionId = client.subscribe({
 						query: graphQLParams.query,
 						variables: graphQLParams.variables,
 						id: socket.id,
 					},(error,result)=>{
 						if (error) {
-							observer.error(error);
+							//observer.error(error);
+							observer.error(JSON.stringify({errors:error}, null, 2));
 						}
 						else {
 							observer.next(result);
