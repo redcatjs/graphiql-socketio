@@ -83,8 +83,8 @@ function hasSubscriptionOperation(graphQlParams){
 
 let subscriptionsFetcher;
 const socket = io(GRAPHQL_WS_PATH);
+const client = new Client(socket);
 socket.on('connect',()=>{
-	const client = new Client(socket);
 
 
 	let activeSubscriptionId = null;
@@ -105,6 +105,7 @@ socket.on('connect',()=>{
 					},(error,result)=>{
 						if (error) {
 							//observer.error(error);
+							//console.error(error);
 							observer.error(JSON.stringify({errors:error}, null, 2));
 						}
 						else {
