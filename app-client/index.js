@@ -115,7 +115,6 @@ function initSubscriptionTransportWs(){
 	});
 	networkQuery = (observer, data)=>{
 		return client.request(data).subscribe((result)=>{
-			console.log('result',result);
 			observer.next(result);
 		},(error)=>{
 			handleError(observer,error);
