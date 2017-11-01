@@ -86,11 +86,12 @@ function hasSubscriptionOperation(graphQlParams){
 
 let SOCKET_INTERFACE;
 SOCKET_INTERFACE = 'subscription-transport-ws';
-SOCKET_INTERFACE = 'socketio';
+//SOCKET_INTERFACE = 'socketio';
 
 let networkQuery;
 let client;
-let activeSubscriptionId = null;
+let activeSubscription = null;
+let unsubscribe;
 
 switch(SOCKET_INTERFACE){
 	case 'socketio':
@@ -102,14 +103,22 @@ switch(SOCKET_INTERFACE){
 	break;
 }
 
+function handleError(observer, error){
+	observer.error(JSON.stringify({errors:error}, null, 2))
+}
+
+
 function initSubscriptionTransportWs(){
 	const WS_PATH = 'ws://'+GRAPHQL_WS_PATH.replace('http://','').replace('https://','')+'/subscriptions';
 	client = new SubscriptionClient(WS_PATH, {
 		reconnect: true,
 	});
 	networkQuery = (observer, data)=>{
-		return client.request(data, (...args)=>{
-			networkCallback(observer, ...args);
+		return client.request(data).subscribe((result)=>{
+			console.log('result',result);
+			observer.next(result);
+		},(error)=>{
+			handleError(observer,error);
 		});
 	};
 	render();
@@ -136,9 +145,7 @@ function initSocketIo(){
 
 function networkCallback(observer, error,result){
 	if (error) {
-		//observer.error(error);
-		//console.error(error);
-		observer.error(JSON.stringify({errors:error}, null, 2));
+		handleError(observer,error);
 	}
 	else {
 		observer.next(result);
@@ -147,18 +154,34 @@ function networkCallback(observer, error,result){
 
 
 function subscriptionsFetcher(graphQLParams){
-	if (activeSubscriptionId !== null) {
-		client.unsubscribe(activeSubscriptionId);
+	if (activeSubscription) {
+		activeSubscription = false;
+		unsubscribe();
 	}
 
 	if (hasSubscriptionOperation(graphQLParams)) {
 		return {
 			subscribe: (observer) => {
 				observer.next('Your subscription data will appear here after server publication!');
-				activeSubscriptionId = networkQuery(observer, {
+				
+				activeSubscription = true;
+				
+				let unsubscribtion = networkQuery(observer, {
 					query: graphQLParams.query,
 					variables: graphQLParams.variables,
 				});
+				
+				if(typeof(unsubscribtion)=='object'){ //ws
+					unsubscribe = function(){
+						unsubscribtion.unsubscribe();
+					};
+				}
+				else{ //socketio
+					unsubscribe = function(){
+						client.unsubscribe(unsubscribtion);
+					};
+				}
+				
 			},
 		};
 	}
