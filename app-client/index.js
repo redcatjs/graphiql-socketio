@@ -1,7 +1,11 @@
 import io from 'socket.io-client'
 import { Client } from 'graphql-socketio-subscriptions-transport'
 
-import { GRAPHQL_HTTP_PATH, GRAPHQL_WS_PATH } from './config'
+import { SubscriptionClient } from 'subscriptions-transport-ws'
+
+
+
+import { GRAPHQL_HTTP_PATH, GRAPHQL_WS_PATH } from './config';
 
 var search = window.location.search;
 var parameters = {};
@@ -45,7 +49,7 @@ function updateURL() {
 	history.replaceState(null, null, newSearch);
 }
 
-function graphQLFetcher(graphQLParams) {
+function graphQLFetcherHTTP(graphQLParams) {
 
 	return fetch(GRAPHQL_HTTP_PATH, {
 		method: 'POST',
@@ -80,49 +84,88 @@ function hasSubscriptionOperation(graphQlParams){
 	return false;
 }
 
+let SOCKET_INTERFACE;
+SOCKET_INTERFACE = 'subscription-transport-ws';
+SOCKET_INTERFACE = 'socketio';
 
-let subscriptionsFetcher;
-const socket = io(GRAPHQL_WS_PATH);
-const client = new Client(socket);
-socket.on('connect',()=>{
+let networkQuery;
+let client;
+let activeSubscriptionId = null;
 
+switch(SOCKET_INTERFACE){
+	case 'socketio':
+		initSocketIo();
+	break;
+	case 'subscription-transport-ws':
+	default:		
+		initSubscriptionTransportWs();
+	break;
+}
 
-	let activeSubscriptionId = null;
-	subscriptionsFetcher = function(graphQLParams){
-		if (activeSubscriptionId !== null) {
-			client.unsubscribe(activeSubscriptionId);
-		}
-
-		if (hasSubscriptionOperation(graphQLParams)) {
-			return {
-				subscribe: (observer) => {
-					observer.next('Your subscription data will appear here after server publication!');
-										
-					activeSubscriptionId = client.subscribe({
-						query: graphQLParams.query,
-						variables: graphQLParams.variables,
-						id: socket.id,
-					},(error,result)=>{
-						if (error) {
-							//observer.error(error);
-							//console.error(error);
-							observer.error(JSON.stringify({errors:error}, null, 2));
-						}
-						else {
-							observer.next(result);
-						}
-					});
-				},
-			};
-		}
-		else {
-			return graphQLFetcher(graphQLParams);
-		}
-	}
-	
+function initSubscriptionTransportWs(){
+	const WS_PATH = 'ws://'+GRAPHQL_WS_PATH.replace('http://','').replace('https://','')+'/subscriptions';
+	client = new SubscriptionClient(WS_PATH, {
+		reconnect: true,
+	});
+	networkQuery = (observer, data)=>{
+		return client.request(data, (...args)=>{
+			networkCallback(observer, ...args);
+		});
+	};
 	render();
+}
 
-});
+function initSocketIo(){
+
+	const socket = io(GRAPHQL_WS_PATH);
+	client = new Client(socket);
+	
+	networkQuery = (observer, data)=>{
+		return client.subscribe({
+			...data,
+			id: socket.id
+		}, (...args)=>{
+			networkCallback(observer, ...args);
+		});
+	};
+
+	socket.on('connect',()=>{
+		render();
+	});
+}
+
+function networkCallback(observer, error,result){
+	if (error) {
+		//observer.error(error);
+		//console.error(error);
+		observer.error(JSON.stringify({errors:error}, null, 2));
+	}
+	else {
+		observer.next(result);
+	}
+}
+
+
+function subscriptionsFetcher(graphQLParams){
+	if (activeSubscriptionId !== null) {
+		client.unsubscribe(activeSubscriptionId);
+	}
+
+	if (hasSubscriptionOperation(graphQLParams)) {
+		return {
+			subscribe: (observer) => {
+				observer.next('Your subscription data will appear here after server publication!');
+				activeSubscriptionId = networkQuery(observer, {
+					query: graphQLParams.query,
+					variables: graphQLParams.variables,
+				});
+			},
+		};
+	}
+	else {
+		return graphQLFetcherHTTP(graphQLParams);
+	}
+}
 
 function render(){
 	ReactDOM.render(
